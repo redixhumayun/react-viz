@@ -1,0 +1,21 @@
+{
+  "name": "react-viz",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node ./index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Zaid Humayun",
+  "license": "ISC",
+  "dependencies": {
+    "koa": "^2.5.1",
+    "koa-router": "^7.4.0",
+    "mssql": "^4.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^1.17.5",
+    "standard": "^11.0.1"
+  }
+}
