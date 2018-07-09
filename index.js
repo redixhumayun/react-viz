@@ -1,5 +1,5 @@
 const Koa = require('koa')
-
+require('dotenv').config()
 const router = require('./src/routes')
 
 const app = new Koa()
