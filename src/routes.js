@@ -2,8 +2,16 @@ const router = require('koa-router')()
 const sql = require('mssql')
 const moment = require('moment')
 
+/**
+ * Function to clean up white spaces around string
+ * @param {string} location
+ */
 const formatStrings = (location) => location.trim()
 
+/**
+ * Function to clean up data by formatting date and string
+ * @param {object} data
+ */
 const cleanupData = (data) => {
   return data.map((datum, index) => {
     return Object.keys(datum).reduce((acc, curr) => {
@@ -14,6 +22,12 @@ const cleanupData = (data) => {
   })
 }
 
+/**
+ * Function to group array of objects by key
+ * @param {object} data
+ * @param {string} key
+ * @return {object}
+ */
 const groupBy = (data, key) => {
   return data.reduce((acc, curr) => {
     if (!acc[curr[key]]) { acc[curr[key]] = [] }
@@ -22,6 +36,11 @@ const groupBy = (data, key) => {
   }, {})
 }
 
+/**
+ * Converts date to moment object
+ * @param {string} date
+ * @returns {moment}
+ */
 const formatDate = (date) => {
   const newDate = []
   const currDate = date.toString()
@@ -35,6 +54,9 @@ const formatDate = (date) => {
 }
 
 router
+/**
+ * Route to get the overall factory data
+ */
   .get('/:fromDate/:toDate', async (ctx, next) => {
     ctx.set('Access-Control-Allow-Origin', '*')
     const { fromDate, toDate } = ctx.params
@@ -65,6 +87,9 @@ router
     }
   })
 
+  /**
+   * Route to get the batch data for each factory
+   */
   .get('/batchdata/:fromDate/:toDate', async (ctx, next) => {
     ctx.set('Access-Control-Allow-Origin', '*')
     const { fromDate, toDate } = ctx.params
