@@ -6,18 +6,29 @@ const moment = require('moment')
  * Function to clean up white spaces around string
  * @param {string} location
  */
-const formatStrings = (location) => location.trim()
+const formatString = (location) => location.trim()
 
 /**
- * Function to clean up data by formatting date and string
+ * Function to clean up data by formatting date and trimming strings
  * @param {object} data
+ * @return {object}
  */
 const cleanupData = (data) => {
-  return data.map((datum, index) => {
+  return data.map((datum) => {
     return Object.keys(datum).reduce((acc, curr) => {
-      if (curr === 'PRDDATE') acc[curr] = formatDate(datum[curr])
-      if (curr === 'LOCATION') acc[curr] = formatStrings(datum[curr])
-      return Object.assign({}, {...datum}, {...acc})
+      switch (curr) {
+        case 'PRDDATE':
+          acc[curr] = formatDate(datum[curr])
+          break
+        case 'LOCATION':
+        case 'BATCH':
+        case 'PRODUCT':
+          acc[curr] = formatString(datum[curr])
+          break
+        default:
+          acc[curr] = datum[curr]
+      }
+      return acc
     }, {})
   })
 }
@@ -50,7 +61,7 @@ const formatDate = (date) => {
       newDate.push('/')
     }
   }
-  return moment(new Date(newDate.join('')))
+  return moment(new Date(newDate.join(''))).format('MMMM, DD')
 }
 
 router
@@ -78,9 +89,9 @@ router
                       SELECT LOCATION, PRDDATE, CAST(SUM(SAMPRD) as DECIMAL(16, 0)) AS TTLSAMS,
                       AVG(NOFMAC) as TTLMAC FROM daily_prod(${fromDate}, ${toDate}) GROUP BY LOCATION, PRDDATE
                     ) AS P GROUP BY LOCATION, PRDDATE, TTLSAMS, TTLMAC`)
-      await sql.close()
       const formattedData = groupBy(cleanupData(result.recordset), 'LOCATION')
       ctx.body = formattedData
+      await sql.close()
     } catch (error) {
       console.log(error)
       sql.close()
@@ -105,9 +116,15 @@ router
         `SELECT LOCATION, BATCH, PRODUCT, PRDDATE, SAMS, PRODQTY, SAMPRD, NOFMAC
         FROM daily_prod(${fromDate}, ${toDate})`
       )
+      const cleanData = cleanupData(result.recordset)
+      const groupedData = groupBy(cleanData, 'PRDDATE')
+      const updatedData = Object.keys(groupedData).reduce((acc, curr) => {
+        const temp = groupBy(groupedData[curr], 'LOCATION')
+        acc[curr] = temp
+        return acc
+      }, {})
+      ctx.body = updatedData
       await sql.close()
-      const formattedData = groupBy(cleanupData(result.recordset), 'PRDDATE')
-      ctx.body = formattedData
     } catch (error) {
       console.log(error)
       sql.close()
