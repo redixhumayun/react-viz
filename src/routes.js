@@ -10,20 +10,11 @@ const formatString = (location) => location.trim()
 
 /**
  * Converts date to moment object
- * @param {string} date
+ * @param {string} number
  * @returns {moment}
  */
 const formatDate = (date) => {
-  const newDate = []
-  const currDate = date.toString()
-  for (let i = 0; i < currDate.length; i++) {
-    newDate.push(currDate[i])
-    if (i === 3 || i === 5) {
-      newDate.push('/')
-    }
-  }
-  // return moment(new Date(newDate.join(''))).format('MMMM DD, YYYY')
-  return moment(new Date(newDate.join('')))
+  return moment(date.toString()).format('YYYY-MM-DD')
 }
 
 /**
