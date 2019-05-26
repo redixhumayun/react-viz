@@ -1,6 +1,71 @@
 const router = require('koa-router')()
 const sql = require('mssql')
 const moment = require('moment')
+const cron = require('node-cron')
+const nodemailer = require('nodemailer')
+
+  // var task = cron.schedule('51 18 * * *', () => {
+  //   console.log('Running cron task')
+  // }, {
+  //   scheduled: false,
+  //   timezone: 'Asia/Kolkata'
+  // })
+
+  // task.start()
+
+; (async () => {
+  try {
+    const config = {
+      user: process.env.DB_USERNAME,
+      password: process.env.DB_PASSWORD,
+      server: process.env.DB_HOSTIP,
+      database: 'PPMDAT'
+    }
+    const fromDate = moment().subtract(1, 'days').format('YYYYMMDD')
+    const toDate = moment().subtract(1, 'days').format('YYYYMMDD')
+    const pool = await new sql.ConnectionPool(config).connect()
+    const result = await pool.request().query(`SELECT PRDDATE,
+                                                (TTLSAMS/(NULLIF(TTLMAC * 480, 0))) * 100 AS EFF
+                                                FROM(
+                                                  SELECT PRDDATE, SUM(NOFMAC) as TTLMAC, SUM(SAMPRD) as TTLSAMS
+                                                  FROM daily_prod(${fromDate}, ${toDate})
+                                                  GROUP BY PRDDATE
+                                                ) AS P GROUP BY PRDDATE, TTLMAC, TTLSAMS`)
+    const formattedResult = cleanupData(result.recordset)
+    dispatchMail(formattedResult[0])
+    await sql.close()
+  } catch (error) {
+    console.log(error)
+    sql.close()
+  }
+})()
+
+function dispatchMail ({ PRDDATE, EFF }) {
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: 'redixhumayun@gmail.com',
+      pass: 'ovdlnxindbfqoibq'
+    }
+  })
+
+  const formattedDate = moment(PRDDATE).format('dddd, MMMM DD, YYYY')
+
+  const mailOptions = {
+    from: 'redixhumayun@gmail.com',
+    to: 'zaid.humayun93@gmail.com',
+    subject: 'Subject',
+    html: `<p>Date: ${formattedDate}, Sewing Eff: ${EFF}%</p>`
+  }
+
+  transporter.sendMail(mailOptions, function (err, info) {
+    if (err) {
+      console.log(err)
+    } else {
+      console.log(info)
+    }
+  })
+}
 
 /**
  * Function to clean up white spaces around string
@@ -77,9 +142,44 @@ const convertToArray = (data, key) => {
 }
 
 router
-/**
- * Data for a single day across factories
- */
+
+  /**
+   * Route to get the efficiency of each factory on a single day in descending order of EFF
+   * Includes LOCATION, PRDDATE, EFF, TTLPROD
+   */
+  .get('/factoryEffOrder/:date', async (ctx) => {
+    ctx.set('Access-Control-Allow-Origin', '*')
+    const { date } = ctx.params
+    try {
+      const config = {
+        user: process.env.DB_USERNAME,
+        password: process.env.DB_PASSWORD,
+        server: process.env.DB_HOSTIP,
+        database: 'PPMDAT'
+      }
+      const pool = await new sql.ConnectionPool(config).connect()
+      const result = await pool.request().query(
+        `SELECT LOCATION,
+                PRDDATE,
+                (TTLSAMS/(NULLIF(TTLMAC * 480, 0))) * 100 AS EFF,
+                TTLPROD
+                FROM(
+                    SELECT LOCATION, PRDDATE, SUM(NOFMAC) as TTLMAC, SUM(SAMPRD) as TTLSAMS, SUM(PRODQTY) as TTLPROD
+                    FROM daily_prod(${date}, ${date})
+                    GROUP BY LOCATION, PRDDATE
+                ) AS P GROUP BY LOCATION, PRDDATE, TTLMAC, TTLSAMS, TTLPROD ORDER BY EFF DESC`
+      )
+      ctx.body = result.recordset
+      await sql.close()
+    } catch (error) {
+      console.log(error)
+      sql.close()
+    }
+  })
+
+  /**
+   * Data for a single day across factories
+   */
   .get('/:fromDate/:toDate', async (ctx) => {
     ctx.set('Access-Control-Allow-Origin', '*')
     const { fromDate, toDate } = ctx.params
@@ -105,14 +205,13 @@ router
       ctx.body = arrayData
       await sql.close()
     } catch (error) {
-      console.log(error)
       sql.close()
     }
   })
 
-/**
- * Route to get the overall factory data
- */
+  /**
+   * Route to get the overall factory data
+   */
   .get('/averageEff/:fromDate/:toDate', async (ctx) => {
     ctx.set('Access-Control-Allow-Origin', '*')
     const { fromDate, toDate } = ctx.params
